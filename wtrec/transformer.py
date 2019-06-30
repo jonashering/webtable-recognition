@@ -115,8 +115,15 @@ class _BaselineSample(object):
 
             self.obj = concat([self.obj, features])
 
-
     def transform(self):
+        """
+        Generate feature vector for a single web table according to baseline
+
+        Args:
+            None
+        Returns:
+            Dataframe with raw, label and feture vector for a single web column
+        """
         self._parse()
         self._add_global_layout_features()
         self._add_layout_features()
@@ -127,6 +134,14 @@ class _BaselineSample(object):
 
 
 def transform_for_baseline(raw_dataframe):
+    """
+    Transform an unprocessed web table dataset to feature space according to baseline
+
+    Args:
+        Dataframe with columns raw and label
+    Returns:
+        Dataframe with columns raw, label and feature space (107 columns)
+    """
     with_features = DataFrame()
     for _, row in raw_dataframe.iterrows():
         try:
@@ -135,3 +150,32 @@ def transform_for_baseline(raw_dataframe):
             continue
 
     return with_features
+
+
+class _ApproachSample(object):
+    def __init__(self, obj):
+        super().__init__()
+        self.obj = obj
+
+    def transform(self):
+        """
+        Generate feature vector for a single web table according to our approach
+
+        Args:
+            None
+        Returns:
+            Dataframe with raw, label and feture vector for a single web column
+        """
+        pass
+
+
+def transform_for_approach(raw_dataframe):
+    """
+    Transform an unprocessed web table dataset to feature space according to our approach
+
+    Args:
+        Dataframe with columns raw and label
+    Returns:
+        Dataframe with columns raw, label and feature space
+    """
+    pass
