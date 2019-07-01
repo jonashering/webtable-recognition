@@ -65,7 +65,9 @@ class _BaselineSample(object):
 
     def _add_layout_features(self):
         for i in self.cols:
-            total_rowspan = np.sum([int(bs(x, 'html.parser').find_all(['td', 'th'])[0].attrs.get('rowspan', 0)) for x in i[0]])
+            total_rowspan = np.sum(
+                [int(bs(x, 'html.parser').find_all(['td', 'th'])[0].attrs.get('rowspan', 0)) for x in i[0]]
+            )
             num_rowspan = len([1 for x in i[0] if 'rowspan' in bs(x, 'html.parser').find_all(['td', 'th'])[0].attrs])
             features = DataFrame({
                 'avg_length': [np.mean([len(str(elem)) for elem in i[1]])],
@@ -77,7 +79,9 @@ class _BaselineSample(object):
             self.obj = concat([self.obj, features])
 
         for i in self.rows:
-            total_colspan = np.sum([int(bs(x, 'html.parser').find_all(['td', 'th'])[0].attrs.get('colspan', 0)) for x in i[0]])
+            total_colspan = np.sum(
+                [int(bs(x, 'html.parser').find_all(['td', 'th'])[0].attrs.get('colspan', 0)) for x in i[0]]
+            )
             num_colspan = len([1 for x in i[0] if 'colspan' in bs(x, 'html.parser').find_all(['td', 'th'])[0].attrs])
             features = DataFrame({
                 'avg_length': [np.mean([len(str(elem)) for elem in i[1]])],
@@ -147,7 +151,7 @@ def transform_for_baseline(raw_dataframe):
         try:
             with_features = with_features.append(_BaselineSample(row).transform(), ignore_index=True)
         except IndexError:  # FIXME: only tables with min shape 2x2 in dataset!
-            continue
+            print(row['path'])
 
     return with_features
 
@@ -176,6 +180,7 @@ def transform_for_approach(raw_dataframe):
     Args:
         Dataframe with columns raw and label
     Returns:
-        Dataframe with columns raw, label and feature space
+        Dataframe with columns raw, label and imagepath
+        Generates image representations of web table
     """
     pass
