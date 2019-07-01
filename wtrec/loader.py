@@ -20,8 +20,10 @@ def load_from_directory(container_path):
     label_names = dataset['target_names']
     raw = dataset['data']
     labels = labels = [label_names[idx] for idx in dataset['target']]
+    filenames = dataset['filenames']
 
     return DataFrame({
         'raw': raw,
-        'label': labels
+        'label': labels,
+        'path': filenames
     })
