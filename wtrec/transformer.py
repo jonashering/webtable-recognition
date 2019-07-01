@@ -1,6 +1,7 @@
 from pandas import read_html, concat, DataFrame
 import numpy as np
 import re
+import os
 from bs4 import BeautifulSoup as bs
 
 
@@ -157,23 +158,41 @@ def transform_for_baseline(raw_dataframe):
 
 
 class _ApproachSample(object):
-    def __init__(self, obj):
+    def __init__(self, obj, base_path):
         super().__init__()
         self.obj = obj
+        self.base_path = base_path
+
+    def _preprocess_html(self):
+        pass
+
+    def _create_image_from_html(self):
+        pass
+
+    def _trim_table(self):
+        pass
 
     def transform(self):
         """
-        Generate feature vector for a single web table according to our approach
+        Generate image re for a single web table according to our approach
 
         Args:
             None
         Returns:
             Dataframe with raw, label and feture vector for a single web column
         """
-        pass
+        self.new_html = self._preprocess_html()
+        img_path = self._create_image_from_html()
+        features = DataFrame({
+            'img_path': img_path,
+            'new_html': self.new_html
+        }).T
+        self.obj = concat([self.obj, features])
+
+        return self.obj.T
 
 
-def transform_for_approach(raw_dataframe):
+def transform_for_approach(raw_dataframe, dataset_dir):
     """
     Transform an unprocessed web table dataset to feature space according to our approach
 
@@ -183,4 +202,12 @@ def transform_for_approach(raw_dataframe):
         Dataframe with columns raw, label and imagepath
         Generates image representations of web table
     """
-    pass
+    os.makedirs(dataset_dir, exist_ok=True)
+    img_base_path = os.path.join(dataset_dir, 'images')
+    os.makedirs(img_base_path, exist_ok=True)
+
+    with_img_path = DataFrame()
+    for _, row in raw_dataframe.iterrows():
+        with_img_path = with_img_path.append(_ApproachSample(row, img_base_path).transform(), ignore_index=True)
+
+    return with_img_path
