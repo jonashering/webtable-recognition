@@ -2,6 +2,8 @@ from pandas import read_html, concat, DataFrame
 import numpy as np
 import re
 import os
+import imgkit
+import subprocess
 from bs4 import BeautifulSoup as bs
 
 
@@ -164,13 +166,12 @@ class _ApproachSample(object):
         self.base_path = base_path
 
     def _preprocess_html(self):
-        pass
+        return self
 
     def _create_image_from_html(self):
-        pass
-
-    def _trim_table(self):
-        pass
+        temp_path = self.img_path + '-temp'
+        imgkit.from_string(self.new_html, temp_path)
+        subprocess.run(['convert',temp_path,'-trim',self.img_path])
 
     def transform(self):
         """
@@ -182,9 +183,10 @@ class _ApproachSample(object):
             Dataframe with raw, label and feture vector for a single web column
         """
         self.new_html = self._preprocess_html()
-        img_path = self._create_image_from_html()
+        self.img_path = self.base_path + self.obj.path.split("/")[-1]
+        self._create_image_from_html()
         features = DataFrame({
-            'img_path': img_path,
+            'img_path': self.img_path,
             'new_html': self.new_html
         }).T
         self.obj = concat([self.obj, features])
