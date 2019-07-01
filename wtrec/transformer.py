@@ -166,10 +166,11 @@ class _ApproachSample(object):
         self.base_path = base_path
 
     def _preprocess_html(self):
-        return self
+        return str(self.obj['raw'])
 
     def _create_image_from_html(self):
-        temp_path = self.img_path + '-temp'
+        temp_path = self.img_path.split('.png')[0] + '-temp.png'
+        print(temp_path)
         imgkit.from_string(self.new_html, temp_path)
         subprocess.run(['convert',temp_path,'-trim',self.img_path])
 
@@ -183,11 +184,11 @@ class _ApproachSample(object):
             Dataframe with raw, label and feture vector for a single web column
         """
         self.new_html = self._preprocess_html()
-        self.img_path = self.base_path + self.obj.path.split("/")[-1]
+        self.img_path = os.path.join(self.base_path, self.obj['path'].split("/")[-1] + '.png')
         self._create_image_from_html()
         features = DataFrame({
-            'img_path': self.img_path,
-            'new_html': self.new_html
+            'img_path': [self.img_path],
+            'new_html': [self.new_html]
         }).T
         self.obj = concat([self.obj, features])
 
@@ -205,11 +206,9 @@ def transform_for_approach(raw_dataframe, dataset_dir):
         Generates image representations of web table
     """
     os.makedirs(dataset_dir, exist_ok=True)
-    img_base_path = os.path.join(dataset_dir, 'images')
-    os.makedirs(img_base_path, exist_ok=True)
 
     with_img_path = DataFrame()
     for _, row in raw_dataframe.iterrows():
-        with_img_path = with_img_path.append(_ApproachSample(row, img_base_path).transform(), ignore_index=True)
+        with_img_path = with_img_path.append(_ApproachSample(row, dataset_dir).transform(), ignore_index=True)
 
     return with_img_path
