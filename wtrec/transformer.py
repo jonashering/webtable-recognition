@@ -166,7 +166,7 @@ class _ApproachSample(object):
         self.base_path = base_path
 
     def _preprocess_html(self):
-        return str(self.obj['raw'])
+        return self.obj['raw'].decode('utf-8')
 
     def _create_image_from_html(self):
         temp_path = self.img_path.split('.jpg')[0] + '-temp.jpg'
