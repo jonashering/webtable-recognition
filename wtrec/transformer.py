@@ -169,10 +169,13 @@ class _ApproachSample(object):
         return self.obj['raw'].decode('utf-8')
 
     def _create_image_from_html(self):
-        temp_path = self.img_path.split('.jpg')[0] + '-temp.jpg'
-        print(temp_path)
-        imgkit.from_string(self.new_html, temp_path)
-        subprocess.run(['convert',temp_path,'-trim',self.img_path])
+        imgkit.from_string(self.new_html, self.img_temp_path)
+        subprocess.run(['convert',self.img_temp_path,'-trim', self.img_trimmed_path])
+
+    def _resize_image(self):
+        # Alternative way (resized proportionally)
+        # subprocess.run(['convert',self.img_path, "-resize", "500x500", "-extent", "500x500 ", self.img_resized_path])
+        subprocess.run(['convert',self.img_trimmed_path, "-resize", "500x500!", self.img_resized_path])
 
     def transform(self):
         """
@@ -184,8 +187,11 @@ class _ApproachSample(object):
             Dataframe with raw, label and feture vector for a single web column
         """
         self.new_html = self._preprocess_html()
-        self.img_path = os.path.join(self.base_path, self.obj['path'].split("/")[-1] + '.jpg')
+        self.img_temp_path = os.path.join(self.base_path, self.obj['path'].split("/")[-1] + '-temp.jpg')
+        self.img_trimmed_path = os.path.join(self.base_path, self.obj['path'].split("/")[-1] + '-trimmed.jpg')
+        self.img_resized_path = os.path.join(self.base_path, self.obj['path'].split("/")[-1] + '-resized.jpg')
         self._create_image_from_html()
+        self._resize_image()
         features = DataFrame({
             'img_path': [self.img_path],
             'new_html': [self.new_html]
@@ -210,7 +216,7 @@ def transform_for_approach(raw_dataframe, dataset_dir):
     with_img_path = DataFrame()
     for _, row in raw_dataframe.iterrows():
         try:
-            with_img_path = with_img_path.append(_ApproachSample(row, dataset_dir).transform(), ignore_index=True)  
+            with_img_path = with_img_path.append(_ApproachSample(row, dataset_dir).transform(), ignore_index=True)
         except:
             continue
     return with_img_path
