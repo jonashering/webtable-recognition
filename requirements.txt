@@ -5,6 +5,7 @@ matplotlib
 ipython
 jupyter
 pandas
+tensorflow
 keras
 beautifulsoup4
 imgkit
