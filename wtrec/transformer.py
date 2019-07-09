@@ -193,7 +193,7 @@ class _ApproachSample(object):
         self._create_image_from_html()
         self._resize_image()
         features = DataFrame({
-            'img_path': [self.img_path],
+            'img_path': [self.img_resized_path],
             'new_html': [self.new_html]
         }).T
         self.obj = concat([self.obj, features])
