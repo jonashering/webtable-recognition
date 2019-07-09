@@ -153,7 +153,7 @@ def transform_for_baseline(raw_dataframe):
     for _, row in raw_dataframe.iterrows():
         try:
             with_features = with_features.append(_BaselineSample(row).transform(), ignore_index=True)
-        except IndexError:  # FIXME: only tables with min shape 2x2 in dataset!
+        except:  # FIXME: only tables with min shape 2x2 in dataset!
             print(row['path'])
 
     return with_features
