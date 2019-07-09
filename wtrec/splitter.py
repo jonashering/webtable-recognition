@@ -13,7 +13,7 @@ def _shuffle(data):
 
 def split_random(data, test_size=0.3):
     test_size = int(data.shape[0] * test_size)
-    train_size = len(data) - test_size 
+    train_size = len(data) - test_size
 
     data = _shuffle(data)[:test_size + train_size]
     data = data.reindex().drop(DROP_COLUMS, axis=1)
