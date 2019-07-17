@@ -166,10 +166,86 @@ class _ApproachSample(object):
         self.base_path = base_path
 
     def _preprocess_html(self):
-        return self.obj['raw'].decode('utf-8')
+        SCALE_CELL_DIMENSIONS = True
+        CELL_WIDTH_HEIGHT = '5px'
+
+        USE_TEXT_LENGTH = False
+        LONG_TEXT_LENGTH = 10
+
+        REMOVE_BORDERS = False
+
+        decoded = self.obj['raw'].decode('utf-8', 'replace')
+        soup = bs(decoded, 'html.parser')
+
+        # print(soup.prettify(formatter=None))
+
+        # clear all attributes that could impact styling (except col- and rowspan)
+        for tag in soup.find_all():
+            new_attr = {}
+            if 'colspan' in tag.attrs:
+                new_attr['colspan'] = tag.attrs['colspan']
+            if 'rowspan' in tag.attrs:
+                new_attr['rowspan'] = tag.attrs['rowspan']
+            tag.attrs = new_attr
+
+        # set color
+        for tag in soup.find_all('th'):
+            if SCALE_CELL_DIMENSIONS:
+                tag['width'] = CELL_WIDTH_HEIGHT
+                tag['height'] = CELL_WIDTH_HEIGHT
+
+            tag['style'] = 'background-color: grey'
+            # replace content
+                # ALTERNATIVE CODE INCASE WE DECIDE TO KEEP THE STRUCTURE
+                # if KEEP_STRUCTURE and tag.string:
+                #   tag.string = "&nbsp;" * len(tag.string.strip())
+            tag.clear()
+
+        for tag in soup.find_all('td'):
+            if SCALE_CELL_DIMENSIONS:
+                tag['width'] = CELL_WIDTH_HEIGHT
+                tag['height'] = CELL_WIDTH_HEIGHT
+
+            color = 'white'
+            if tag.find('a'):
+                color = 'blue'
+            elif tag.find('img'):
+                color = 'green'
+            elif tag.find('button'):
+                color = 'purple'
+            elif tag.find('form') or tag.find('input'):
+                color = 'pink'
+            else:
+                text = tag.text.strip()
+
+                # cells text majority are numeric characters
+                if sum(c.isdigit() for c in text) > (len(text) / 2):
+                    color = 'red'
+
+                elif USE_TEXT_LENGTH and len(text) > LONG_TEXT_LENGTH :
+                    color = 'brown'
+
+                elif tag.find('b'):
+                    color = 'orange'
+                else:
+                    color = 'yellow'
+
+            tag['style'] = 'background-color: ' + color
+            # replace content
+            tag.clear()
+
+        if REMOVE_BORDERS:
+            tag = soup.find('table')
+            tag['cellspacing'] = 0
+            tag['cellpadding'] = 0
+
+        #print(soup.prettify(formatter=None))
+        return soup.prettify(formatter=None)
 
     def _create_image_from_html(self):
         imgkit.from_string(self.new_html, self.img_temp_path)
+
+    def _trim_image(self):
         subprocess.run(['convert',self.img_temp_path,'-trim', self.img_trimmed_path])
 
     def _resize_image(self):
@@ -186,14 +262,18 @@ class _ApproachSample(object):
         Returns:
             Dataframe with raw, label and feture vector for a single web column
         """
-        self.new_html = self._preprocess_html()
-        self.img_temp_path = os.path.join(self.base_path, self.obj['path'].split("/")[-1] + '-temp.jpg')
-        self.img_trimmed_path = os.path.join(self.base_path, self.obj['path'].split("/")[-1] + '-trimmed.jpg')
+        try:
+            self.new_html = self._preprocess_html()
+        except:
+            self.new_html = '<table></table>'
+        self.img_temp_path = os.path.join(self.base_path, self.obj['path'].split("/")[-1] + '-temp.png')
+        self.img_trimmed_path = os.path.join(self.base_path, self.obj['path'].split("/")[-1] + '-trimmed.png')
         self.img_resized_path = os.path.join(self.base_path, self.obj['path'].split("/")[-1] + '-resized.jpg')
         self._create_image_from_html()
-        self._resize_image()
+        self._trim_image()
+        #self._resize_image()
         features = DataFrame({
-            'img_path': [self.img_resized_path],
+            'img_path': [self.img_trimmed_path],
             'new_html': [self.new_html]
         }).T
         self.obj = concat([self.obj, features])
