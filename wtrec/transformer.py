@@ -249,7 +249,6 @@ class _ApproachSample(object):
             'transformed_html': str(soup.prettify(formatter='minimal'))
         })
 
-
     def _preprocess_html_grid(self):
         soup = bs(self.obj['raw'], 'html.parser')
 
