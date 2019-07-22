@@ -177,7 +177,6 @@ def transform_for_baseline(raw_dataframe):
 class _ApproachSample(object):
     def __init__(self,
                  obj,
-                 render_field='transformed_html',
                  strategy=None,
                  scale_cell_dimensions=True,
                  cell_size='5px',
@@ -187,7 +186,6 @@ class _ApproachSample(object):
                  resize_mode='stretch'):
         super().__init__()
         self.obj = obj
-        self.render_field = render_field
         self.strategy = strategy
         self.scale_cell_dimensions = scale_cell_dimensions
         self.cell_size = cell_size
@@ -358,7 +356,7 @@ class _ApproachSample(object):
         return image
 
     def _render_html(self):
-        image = self._generate_image_from_html(self.obj[self.render_field])  # .decode('utf-8', 'replace'))
+        image = self._generate_image_from_html(self.obj['transformed_html'])  # .decode('utf-8', 'replace'))
         image = self._crop_surrounding_whitespace(image)
         image = self._resize(image)
 
@@ -376,7 +374,9 @@ class _ApproachSample(object):
             Dataframe with raw, label and feture vector for a single web column
         """
         try:
-            if self.strategy == 'grid':
+            if self.strategy == 'raw':
+                self.obj['transformed_html'] = self.obj['raw']
+            elif self.strategy == 'grid':
                 self._preprocess_html_grid()
             elif self.strategy == 'char_blocks':
                 self.obj['transformed_html'] = '<table></table>'  # TODO implement
@@ -390,7 +390,7 @@ class _ApproachSample(object):
         return self.obj
 
 
-def transform_for_approach(raw_dataframe, strategy='grid'):
+def transform_for_approach(raw_dataframe, strategy='raw'):
     """
     Transform an unprocessed web table dataset to feature space according to our approach
 
