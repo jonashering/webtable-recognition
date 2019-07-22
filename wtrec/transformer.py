@@ -178,7 +178,7 @@ class _ApproachSample(object):
     def __init__(self,
                  obj,
                  render_field='transformed_html',
-                 strategy='grid',
+                 strategy=None,
                  scale_cell_dimensions=True,
                  cell_size='5px',
                  long_text_threshold=10,
@@ -199,35 +199,17 @@ class _ApproachSample(object):
     def _preprocess_html_grid(self):
         soup = bs(self.obj['raw'], 'html.parser')
 
-        # clear all attributes that could impact styling (except col- and rowspan)
-        for tag in soup.find_all():
-            new_attr = {}
-            if 'colspan' in tag.attrs:
-                new_attr['colspan'] = tag.attrs['colspan']
-            if 'rowspan' in tag.attrs:
-                new_attr['rowspan'] = tag.attrs['rowspan']
-            tag.attrs = new_attr
+        soup = self._clear_styling_attributes(soup)
 
-        # set color
-        for tag in soup.find_all('th'):
-            if self.scale_cell_dimensions:
-                tag['width'] = self.cell_size
-                tag['height'] = self.cell_size
-
-            tag['style'] = 'background-color: grey'
-            # replace content
-                # ALTERNATIVE CODE INCASE WE DECIDE TO KEEP THE STRUCTURE
-                # if KEEP_STRUCTURE and tag.string:
-                #   tag.string = "&nbsp;" * len(tag.string.strip())
-            tag.clear()
-
-        for tag in soup.find_all('td'):
+        for tag in soup.find_all(['th','td']):
             if self.scale_cell_dimensions:
                 tag['width'] = self.cell_size
                 tag['height'] = self.cell_size
 
             color = 'white'
-            if tag.find('a'):
+            if tag.name == 'th':
+                color = 'grey'
+            elif tag.find('a'):
                 color = 'blue'
             elif tag.find('img'):
                 color = 'green'
@@ -249,6 +231,9 @@ class _ApproachSample(object):
 
             tag['style'] = 'background-color: ' + color
             # replace content
+                # ALTERNATIVE CODE INCASE WE DECIDE TO KEEP THE STRUCTURE
+                # if KEEP_STRUCTURE and tag.string:
+                #   tag.string = "&nbsp;" * len(tag.string.strip())
             tag.clear()
 
         if not self.draw_borders:
@@ -259,6 +244,17 @@ class _ApproachSample(object):
         self.obj.update({
             'transformed_html': str(soup.prettify(formatter='minimal'))
         })
+
+    def _clear_styling_attributes(self, soup):
+        # clear all attributes that could impact styling (except col- and rowspan)
+        for tag in soup.find_all():
+            new_attr = {}
+            if 'colspan' in tag.attrs:
+                new_attr['colspan'] = tag.attrs['colspan']
+            if 'rowspan' in tag.attrs:
+                new_attr['rowspan'] = tag.attrs['rowspan']
+            tag.attrs = new_attr
+        return soup
 
     def _generate_image_from_html(self, html):
         with NamedTemporaryFile(suffix='.png') as f:
@@ -320,8 +316,10 @@ class _ApproachSample(object):
         try:
             if self.strategy == 'grid':
                 self._preprocess_html_grid()
-            elif self.strategy == 'char_blocks'
+            elif self.strategy == 'char_blocks':
                 self.obj['transformed_html'] = '<table></table>'  # TODO implement
+            elif self.strategy == 'color_shades':
+                self._preprocess_html_color_shades()
         except:
             self.obj['transformed_html'] = '<table></table>'
 
@@ -330,7 +328,7 @@ class _ApproachSample(object):
         return self.obj
 
 
-def transform_for_approach(raw_dataframe):
+def transform_for_approach(raw_dataframe, strategy='grid'):
     """
     Transform an unprocessed web table dataset to feature space according to our approach
 
@@ -344,7 +342,7 @@ def transform_for_approach(raw_dataframe):
     new_records = []
 
     def _transform(rec):
-        new_records.append(_ApproachSample(rec).transform())
+        new_records.append(_ApproachSample(rec, strategy=strategy).transform())
 
     Parallel(n_jobs=-1, require='sharedmem')(delayed(_transform)(i) for i in tqdm(records))
 
