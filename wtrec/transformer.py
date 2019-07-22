@@ -178,6 +178,7 @@ class _ApproachSample(object):
     def __init__(self,
                  obj,
                  render_field='transformed_html',
+                 strategy='grid',
                  scale_cell_dimensions=True,
                  cell_size='5px',
                  long_text_threshold=10,
@@ -187,6 +188,7 @@ class _ApproachSample(object):
         super().__init__()
         self.obj = obj
         self.render_field = render_field
+        self.strategy = strategy
         self.scale_cell_dimensions = scale_cell_dimensions
         self.cell_size = cell_size
         self.long_text_threshold = long_text_threshold
@@ -194,7 +196,7 @@ class _ApproachSample(object):
         self.target_shape = target_shape
         self.resize_mode = resize_mode
 
-    def _preprocess_html(self):
+    def _preprocess_html_grid(self):
         soup = bs(self.obj['raw'], 'html.parser')
 
         # clear all attributes that could impact styling (except col- and rowspan)
@@ -316,11 +318,14 @@ class _ApproachSample(object):
             Dataframe with raw, label and feture vector for a single web column
         """
         try:
-            self._preprocess_html()
-            self._render_html()
+            if self.strategy == 'grid':
+                self._preprocess_html_grid()
+            elif self.strategy == 'char_blocks'
+                self.obj['transformed_html'] = '<table></table>'  # TODO implement
         except:
             self.obj['transformed_html'] = '<table></table>'
-            self._render_html()
+
+        self._render_html()
 
         return self.obj
 
@@ -332,7 +337,7 @@ def transform_for_approach(raw_dataframe):
     Args:
         Dataframe with columns raw and label
     Returns:
-        Dataframe with columns raw, label and imagepath
+        Dataframe with columns raw, label, transformed_html and image
         Generates image representations of web table
     """
     records = raw_dataframe.to_dict('records')
