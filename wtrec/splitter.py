@@ -70,14 +70,14 @@ class _CustomSequence(Sequence):
         self.y = encoder.fit_transform(y)
         self.classes = encoder.classes_
         self.batch_size = batch_size
-        
+
     def __len__(self):
         return int(np.ceil(len(self.x) / float(self.batch_size)))
-    
+
     def __getitem__(self, idx):
         batch_x = self.x[idx * self.batch_size:(idx + 1) * self.batch_size]
         batch_y = self.y[idx * self.batch_size:(idx + 1) * self.batch_size]
-        
+
         return preprocess_input(batch_x), batch_y
 
 

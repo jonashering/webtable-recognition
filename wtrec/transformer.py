@@ -1,13 +1,10 @@
-from pandas import read_html, concat, DataFrame
+from pandas import read_html, DataFrame
 import numpy as np
 import re
-import os
 import imgkit
-import subprocess
 from bs4 import BeautifulSoup as bs
 from joblib import Parallel, delayed
 from tqdm import tqdm_notebook as tqdm
-import imgkit
 import PIL
 from tempfile import NamedTemporaryFile
 
@@ -173,7 +170,7 @@ def transform_for_baseline(raw_dataframe):
         new_records.append(_BaselineSample(rec).transform())
 
     Parallel(n_jobs=-1, require='sharedmem')(delayed(_transform)(i) for i in tqdm(records))
-        
+
     return DataFrame(new_records)
 
 
@@ -277,7 +274,7 @@ class _ApproachSample(object):
             except:
                 image = PIL.Image.new('RGB', self.target_shape, (255, 255, 255))
         return image.convert('RGB')
-    
+
     def _crop_surrounding_whitespace(self, image):
         bg = PIL.Image.new(image.mode, image.size, (255, 255, 255))
         diff = PIL.ImageChops.difference(image, bg)
@@ -285,7 +282,7 @@ class _ApproachSample(object):
         if not bbox:
             return image
         return image.crop(bbox)
-    
+
     def _resize(self, image):
         if self.resize_mode == 'resize':
             canvas = PIL.Image.new('RGB', self.target_shape, color=(255, 255, 255))
@@ -301,12 +298,12 @@ class _ApproachSample(object):
         return image
 
     def _render_html(self):
-        image = self._generate_image_from_html(self.obj[self.render_field]) #.decode('utf-8', 'replace'))
+        image = self._generate_image_from_html(self.obj[self.render_field])  # .decode('utf-8', 'replace'))
         image = self._crop_surrounding_whitespace(image)
         image = self._resize(image)
-        
+
         self.obj.update({
-            'image': image    
+            'image': image
         })
 
     def transform(self):
@@ -345,5 +342,5 @@ def transform_for_approach(raw_dataframe):
         new_records.append(_ApproachSample(rec).transform())
 
     Parallel(n_jobs=-1, require='sharedmem')(delayed(_transform)(i) for i in tqdm(records))
-        
+
     return DataFrame(new_records)

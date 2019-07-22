@@ -5,11 +5,10 @@ from tensorflow.python.keras.layers import Dense
 from tensorflow.python.keras import optimizers
 
 
-
 def create_baseline_classifier():
     """
     Create GBDT classifier as specified in baseline paper
-    
+
     Args:
         None
     Returns:
@@ -23,7 +22,7 @@ def create_baseline_classifier():
 def create_nn_classifier(freeze_conv=True):
     """
     Create neural network for image rendering approach
-    
+
     Args:
         freeze_conv: Disable training of convolutional layers
     Returns:
