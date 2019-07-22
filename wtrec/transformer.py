@@ -1,12 +1,14 @@
-from pandas import read_html, DataFrame
+from tempfile import NamedTemporaryFile
+from unicodedata import normalize
+
 import numpy as np
-import re
+import PIL
 import imgkit
+import regex as re
+from pandas import read_html, DataFrame
 from bs4 import BeautifulSoup as bs
 from joblib import Parallel, delayed
 from tqdm import tqdm_notebook as tqdm
-import PIL
-from tempfile import NamedTemporaryFile
 
 
 class _BaselineSample(object):
@@ -194,6 +196,33 @@ class _ApproachSample(object):
         self.target_shape = target_shape
         self.resize_mode = resize_mode
 
+    def _clear_styling_attributes(self, soup):
+        # clear all attributes that could impact styling (except col- and rowspan)
+        for tag in soup.find_all():
+            new_attr = {}
+            if 'colspan' in tag.attrs:
+                new_attr['colspan'] = tag.attrs['colspan']
+            if 'rowspan' in tag.attrs:
+                new_attr['rowspan'] = tag.attrs['rowspan']
+            tag.attrs = new_attr
+        return soup
+
+    def _scale_cell_dimensions(self, tag):
+        if self.scale_cell_dimensions:
+            tag['width'] = self.cell_size
+            tag['height'] = self.cell_size
+        return tag
+
+    def _remove_borders(self, soup):
+        if self.remove_borders:
+            tag = soup.find('table')
+            tag['cellspacing'] = 0
+            tag['cellpadding'] = 0
+        return soup
+
+    def _is_emphasized(self, tag):
+        return len(tag.find_all(['b','strong','i'])) > 0
+
     def _preprocess_html_color_shades(self):
         soup = bs(self.obj['raw'], 'html.parser')
 
@@ -289,37 +318,64 @@ class _ApproachSample(object):
             'transformed_html': str(soup.prettify(formatter='minimal'))
         })
 
-    def _clear_styling_attributes(self, soup):
-        # clear all attributes that could impact styling (except col- and rowspan)
-        for tag in soup.find_all():
-            new_attr = {}
-            if 'colspan' in tag.attrs:
-                new_attr['colspan'] = tag.attrs['colspan']
-            if 'rowspan' in tag.attrs:
-                new_attr['rowspan'] = tag.attrs['rowspan']
-            tag.attrs = new_attr
-        return soup
+    def _preprocess_html_char_blocks(self):
+        soup = bs(self.obj['raw'], 'html.parser')
 
-    def _scale_cell_dimensions(self, tag):
-        if self.scale_cell_dimensions:
-            tag['width'] = self.cell_size
-            tag['height'] = self.cell_size
-        return tag
+        for cell in soup.find_all():  # table head cells
+            if 'style' in cell:
+                cell['style'] += ';background-color:none !important'
+            else:
+                cell['style'] = ';background-color:none !important'
 
-    def _remove_borders(self, soup):
-        if self.remove_borders:
-            tag = soup.find('table')
-            tag['cellspacing'] = 0
-            tag['cellpadding'] = 0
-        return soup
+        # character classes: digits, alphabetical, punctuation, whitespace
+        for elem in soup.find_all(text=True):
+            content = normalize('NFKD', elem)
+            for char in content:
+                color = 'white'
+                if re.match(r'[\p{N}]', char) is not None:  # digits
+                    color = 'red'
+                elif re.match(r'[\p{L}]', char) is not None:  # alpha
+                    color = 'blue'
+                elif re.match(r'[!"\#$%&\'()*+,\-./:;<=>?@\[\\\]^_`{|}~]', char) is not None:  # punctuation
+                    color = 'green'
+                new_char = soup.new_tag('span', style=f'color: {color} !important')
+                new_char.string = '█' if re.match(r'[ \t\r\n\v\f]', char) is None else char  # whitespace
+                elem.parent.append(new_char)
+            elem.replace_with('')
 
-    def _is_emphasized(self, tag):
-        return len(tag.find_all(['b','strong','i'])) > 0
+        # images
+        for img in soup.find_all('img'):
+            img['style'] = img.get('style', '') + ';background-color:yellow !important'
+
+        # emphasized text
+        for emp in soup.find_all(['a', 'strong', 'b', 'i', 'u', 'title',]):
+            emp['style'] = emp.get('style', '') + ';opacity:0.4 !important'
+
+        # table head cells
+        for th in soup.find_all('th'):
+            th['style'] = th.get('style', '') + ';background-color:grey !important'
+
+        # input elements
+        for inp in soup.find_all(['button', 'select', 'input']):
+            inp['style'] = inp.get('style', '') + ';background-color:pink !important; border: 0; padding: 3px;'
+
+        # draw table border
+        for tab in soup.find_all('table'):
+            tab['style'] = 'border-collapse: collapse ! important'
+            tab['cellpadding'] = '5'
+
+        # draw table border pt. 2
+        for cell in soup.find_all(['th', 'td']):
+            cell['style'] = cell.get('style', '') + ';border: 2px solid black !important'
+
+        self.obj.update({
+            'transformed_html': str(soup.prettify(formatter='minimal'))
+        })
 
     def _generate_image_from_html(self, html):
         with NamedTemporaryFile(suffix='.png') as f:
             try:  # tables containing iframes or similar external sources cannot be rendered
-                imgkit.from_string(html,
+                imgkit.from_string(f'<meta charset="utf-8">{html}',
                                    f.name,
                                    options={'quiet': '',
                                             'disable-plugins': '',
@@ -344,16 +400,16 @@ class _ApproachSample(object):
     def _resize(self, image):
         if self.resize_mode == 'resize':
             canvas = PIL.Image.new('RGB', self.target_shape, color=(255, 255, 255))
-            canvas.paste(image)
             image.thumbnail(self.target_shape, PIL.Image.ANTIALIAS)
+            canvas.paste(image)
         elif self.resize_mode == 'stretch':
-            image = image.resize(self.target_shape, PIL.Image.ANTIALIAS)
+            canvas = image.resize(self.target_shape, PIL.Image.ANTIALIAS)
         elif self.resize_mode == 'crop':
             canvas = PIL.Image.new('RGB', self.target_shape, color=(255, 255, 255))
             canvas.paste(image)
-            image = image.crop((0, 0, self.target_shape[0], self.target_shape[1]))
+            canvas = canvas.crop((0, 0, self.target_shape[0], self.target_shape[1]))
 
-        return image
+        return canvas
 
     def _render_html(self):
         image = self._generate_image_from_html(self.obj['transformed_html'])  # .decode('utf-8', 'replace'))
@@ -379,7 +435,7 @@ class _ApproachSample(object):
             elif self.strategy == 'grid':
                 self._preprocess_html_grid()
             elif self.strategy == 'char_blocks':
-                self.obj['transformed_html'] = '<table></table>'  # TODO implement
+                self._preprocess_html_char_blocks()
             elif self.strategy == 'color_shades':
                 self._preprocess_html_color_shades()
         except:
@@ -390,7 +446,7 @@ class _ApproachSample(object):
         return self.obj
 
 
-def transform_for_approach(raw_dataframe, strategy='raw'):
+def transform_for_approach(raw_dataframe, strategy='raw', resize_mode='stretch'):
     """
     Transform an unprocessed web table dataset to feature space according to our approach
 
@@ -404,7 +460,7 @@ def transform_for_approach(raw_dataframe, strategy='raw'):
     new_records = []
 
     def _transform(rec):
-        new_records.append(_ApproachSample(rec, strategy=strategy).transform())
+        new_records.append(_ApproachSample(rec, strategy=strategy, resize_mode=resize_mode).transform())
 
     Parallel(n_jobs=-1, require='sharedmem')(delayed(_transform)(i) for i in tqdm(records))
 

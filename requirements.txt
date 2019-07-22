@@ -11,3 +11,4 @@ beautifulsoup4
 imgkit
 joblib
 tqdm
+regex
