@@ -1,7 +1,7 @@
+import os
 from random import sample
 import numpy as np
 import pandas as pd
-import os
 from tensorflow.python.keras.utils.data_utils import Sequence
 from keras.applications.resnet50 import preprocess_input
 from sklearn.preprocessing import LabelBinarizer
