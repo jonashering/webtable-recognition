@@ -196,6 +196,61 @@ class _ApproachSample(object):
         self.target_shape = target_shape
         self.resize_mode = resize_mode
 
+    def _preprocess_html_color_shades(self):
+        soup = bs(self.obj['raw'], 'html.parser')
+
+        soup = self._clear_styling_attributes(soup)
+
+        for tag in soup.find_all(['th', 'td']):
+            tag = self._scale_cell_dimensions(tag)
+
+            text = tag.text.strip()
+
+            # set red for data type
+            ## set r_step so there is an equivalent distance between the groups (255 / 6 ~= 42 )
+            r_step = 42
+
+            r = 0 * r_step
+            if tag.find('a'):
+                r = 1 * r_step
+            elif tag.find('img'):
+                r = 2 * r_step
+            elif tag.find('button'):
+                r = 3 * r_step
+            elif tag.find('form') or tag.find('input'):
+                r = 4 * r_step
+            elif len(text) > 0:
+                # cells text majority are numeric characters
+                if sum(c.isdigit() for c in text) > (len(text) / 2):
+                    r = 5 * r_step
+                else:
+                    r = 255
+
+            ## set g for content length
+            g = 0
+            if len(text) > 255:
+                g = 255
+            else:
+                g = len(text)
+
+            ## set b for styling
+            b = 0
+            is_emphasized = tag.find('b') or tag.find('i')
+            if is_emphasized:
+                b = 127
+            elif tag.name == 'th':
+                b = 255
+
+            tag['style'] = f'background-color: rgb({r},{g},{b})'
+            tag.clear()
+
+        soup = self._remove_borders(soup)
+
+        self.obj.update({
+            'transformed_html': str(soup.prettify(formatter='minimal'))
+        })
+
+
     def _preprocess_html_grid(self):
         soup = bs(self.obj['raw'], 'html.parser')
 
