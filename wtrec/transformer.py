@@ -235,8 +235,7 @@ class _ApproachSample(object):
 
             ## set b for styling
             b = 0
-            is_emphasized = tag.find('b') or tag.find('i')
-            if is_emphasized:
+            if self._is_emphasized(tag):
                 b = 127
             elif tag.name == 'th':
                 b = 255
@@ -277,7 +276,7 @@ class _ApproachSample(object):
                     color = 'red'
                 elif len(text) > self.long_text_threshold:
                     color = 'brown'
-                elif tag.find('b'):
+                elif self._is_emphasized(tag):
                     color = 'orange'
 
             tag['style'] = f'background-color: {color}'
@@ -316,6 +315,9 @@ class _ApproachSample(object):
             tag['cellspacing'] = 0
             tag['cellpadding'] = 0
         return soup
+
+    def _is_emphasized(self, tag):
+        return len(tag.find_all(['b','strong','i'])) > 0
 
     def _generate_image_from_html(self, html):
         with NamedTemporaryFile(suffix='.png') as f:
