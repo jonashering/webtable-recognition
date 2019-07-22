@@ -1,6 +1,10 @@
 from random import sample
 import numpy as np
+import pandas as pd
 import os
+from tensorflow.python.keras.utils.data_utils import Sequence
+from keras.applications.resnet50 import preprocess_input
+from sklearn.preprocessing import LabelBinarizer
 
 
 Y_COLUMN = 'label'
@@ -56,3 +60,29 @@ def split_fixed(data, idx_file_path):
     train_X = train.drop(Y_COLUMN, axis=1)
 
     return train_X, train_Y, test_X, test_Y
+
+
+class _CustomSequence(Sequence):
+    def __init__(self, x, y, batch_size):
+        super().__init__()
+        self.x = np.asarray([np.array(i) for i in x])
+        encoder = LabelBinarizer()
+        self.y = encoder.fit_transform(y)
+        self.classes = encoder.classes_
+        self.batch_size = batch_size
+        
+    def __len__(self):
+        return int(np.ceil(len(self.x) / float(self.batch_size)))
+    
+    def __getitem__(self, idx):
+        batch_x = self.x[idx * self.batch_size:(idx + 1) * self.batch_size]
+        batch_y = self.y[idx * self.batch_size:(idx + 1) * self.batch_size]
+        
+        return preprocess_input(batch_x), batch_y
+
+
+def series_to_sequence(x, y, batch_size=64):
+    if isinstance(x, pd.DataFrame):
+        x = x['image']
+
+    return _CustomSequence(x, y, batch_size)

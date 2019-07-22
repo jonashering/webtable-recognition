@@ -15,11 +15,11 @@ def load_from_directory(container_path):
     if not os.path.isdir(container_path):
         raise NotADirectoryError(container_path)
 
-    dataset = load_files(container_path)
+    dataset = load_files(container_path, random_state=0)
 
     label_names = dataset['target_names']
-    raw = dataset['data']
-    labels = labels = [label_names[idx] for idx in dataset['target']]
+    raw = [idx.decode('utf-8', 'replace') for idx in dataset['data']]
+    labels = [label_names[idx] for idx in dataset['target']]
     filenames = dataset['filenames']
 
     return DataFrame({

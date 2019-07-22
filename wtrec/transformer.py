@@ -5,6 +5,11 @@ import os
 import imgkit
 import subprocess
 from bs4 import BeautifulSoup as bs
+from joblib import Parallel, delayed
+from tqdm import tqdm_notebook as tqdm
+import imgkit
+import PIL
+from tempfile import NamedTemporaryFile
 
 
 class _BaselineSample(object):
@@ -12,12 +17,13 @@ class _BaselineSample(object):
         super().__init__()
         self.obj = obj
         self.raw = str(bs(self.obj['raw'], 'html.parser').find_all('table')[0])
+        self.as_df = read_html(self.raw)[0].fillna('')
 
     def _load_row_html(self, idx):
         row = ''
         try:
             row = bs(self.raw, 'html.parser').find_all('tr')[idx]
-        except:
+        except IndexError:
             row = bs(self.raw, 'html.parser').find_all('tr')[-1]
         cells = []
         for cell in row.find_all(['td', 'th']):
@@ -26,7 +32,12 @@ class _BaselineSample(object):
         return cells
 
     def _load_row_clean(self, idx):
-        return self.as_df.iloc[idx, :]
+        try:
+            row = self.as_df.iloc[idx, :]
+        except IndexError:
+            row = self.as_df.iloc[-1, :]
+
+        return row
 
     def _load_col_html(self, idx):
         col = bs(self.raw, 'html.parser').find_all('tr')
@@ -35,14 +46,19 @@ class _BaselineSample(object):
             cell = ''
             try:
                 cell = row.find_all(['td', 'th'])[idx]
-            except:
+            except IndexError:
                 cell = row.find_all(['td', 'th'])[-1]
             cells.append(str(cell))
 
         return cells
 
     def _load_col_clean(self, idx):
-        return self.as_df.iloc[:, idx]
+        try:
+            col = self.as_df.iloc[:, idx]
+        except IndexError:
+            col = self.as_df.iloc[: -1]
+
+        return col
 
     def _parse(self):
         self.as_df = read_html(self.raw)[0].fillna('')
@@ -58,69 +74,70 @@ class _BaselineSample(object):
         ]
 
     def _add_global_layout_features(self):
-        features = DataFrame({
-            'max_rows': [self.as_df.shape[0]],
-            'max_cols': [self.as_df.shape[1]],
-            'max_cell_length': [max([len(str(elem)) for elem in np.array(self.as_df).flatten()])],
-        }).T
+        features = {
+            'max_rows': self.as_df.shape[0],
+            'max_cols': self.as_df.shape[1],
+            'max_cell_length': max([len(str(elem)) for elem in np.array(self.as_df).flatten()]),
+        }
 
-        self.obj = concat([self.obj, features])
+        self.obj.update(features)
 
     def _add_layout_features(self):
-        for i in self.cols:
+        for idx, i in enumerate(self.cols):
             total_rowspan = np.sum(
                 [int(bs(x, 'html.parser').find_all(['td', 'th'])[0].attrs.get('rowspan', 0)) for x in i[0]]
             )
             num_rowspan = len([1 for x in i[0] if 'rowspan' in bs(x, 'html.parser').find_all(['td', 'th'])[0].attrs])
-            features = DataFrame({
-                'avg_length': [np.mean([len(str(elem)) for elem in i[1]])],
-                'length_variance': [np.var([len(str(elem)) for elem in i[1]])],
-                'ratio_colspan': [0],
-                'ratio_rowspan': [(total_rowspan - num_rowspan) / len(i[1])]
-            }).T
+            features = {
+                f'avg_length_{idx}': np.mean([len(str(elem)) for elem in i[1]]),
+                f'length_variance_{idx}': np.var([len(str(elem)) for elem in i[1]]),
+                f'ratio_colspan_{idx}': 0,  # this is a row!
+                f'ratio_rowspan_{idx}': (total_rowspan - num_rowspan) / len(i[1])
+            }
 
-            self.obj = concat([self.obj, features])
+            self.obj.update(features)
 
-        for i in self.rows:
+        for idx, i in enumerate(self.rows):
             total_colspan = np.sum(
                 [int(bs(x, 'html.parser').find_all(['td', 'th'])[0].attrs.get('colspan', 0)) for x in i[0]]
             )
             num_colspan = len([1 for x in i[0] if 'colspan' in bs(x, 'html.parser').find_all(['td', 'th'])[0].attrs])
-            features = DataFrame({
-                'avg_length': [np.mean([len(str(elem)) for elem in i[1]])],
-                'length_variance': [np.var([len(str(elem)) for elem in i[1]])],
-                'ratio_colspan': [(total_colspan - num_colspan) / len(i[1])],
-                'ratio_rowspan': [0]
-            }).T
 
-            self.obj = concat([self.obj, features])
+            features = {
+                f'avg_length_{idx}': np.mean([len(str(elem)) for elem in i[1]]),
+                f'length_variance_{idx}': np.var([len(str(elem)) for elem in i[1]]),
+                f'ratio_colspan_{idx}': (total_colspan - num_colspan) / len(i[1]),
+                f'ratio_rowspan_{idx}': 0
+            }
+
+            self.obj.update(features)
 
     def _add_html_features(self):
-        for i in self.rows + self.cols:
-            features = DataFrame({
-                'dist_tags': [len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('br'))]) / len(i[0])],  # FIXME
-                'ratio_th': [len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('th'))]) / len(i[0])],
-                'ratio_anchor': [len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('a'))]) / len(i[0])],
-                'ratio_img': [len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('img'))]) / len(i[0])],
-                'ratio_input': [len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('input'))]) / len(i[0])],
-                'ratio_select': [len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('select'))]) / len(i[0])],
-                'ratio_f': [len([1 for x in i[0] if len(bs(x, 'html.parser').find_all(['b', 'u', 'font', 'i']))]) / len(i[0])],
-                'ratio_br': [len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('br'))]) / len(i[0])],
-            }).T
+        for idx, i in enumerate(self.rows + self.cols):
+            features = {
+                f'dist_tags_{idx}': len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('br'))]) / len(i[0]),
+                f'ratio_th_{idx}': len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('th'))]) / len(i[0]),
+                f'ratio_anchor_{idx}': len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('a'))]) / len(i[0]),
+                f'ratio_img_{idx}': len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('img'))]) / len(i[0]),
+                f'ratio_input_{idx}': len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('input'))]) / len(i[0]),
+                f'ratio_select_{idx}': len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('select'))]) / len(i[0]),
+                f'ratio_f_{idx}': len([1 for x in i[0] if len(bs(x, 'html.parser').find_all(['b', 'u', 'font', 'i']))]) / len(i[0]),
+                f'ratio_br_{idx}': len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('br'))]) / len(i[0]),
+            }
 
-            self.obj = concat([self.obj, features])
+            self.obj.update(features)
 
     def _add_lexical_features(self):
-        for i in self.rows + self.cols:
-            features = DataFrame({
-                'dist_string': [len(list(set([re.sub(r'\b\d+\b', '', str(x)) for x in i[1]]))) / len(i[1])],
-                'ratio_colon': [np.mean([int(str(x).endswith(':')) for x in i[1]])],
-                'ratio_contain_number': [np.mean([int(any(char.isdigit() for char in str(x))) for x in i[1]])],
-                'ratio_is_number': [np.mean([int(type(x) in ['float', 'int']) for x in i[1]])],
-                'ratio_nonempty': [np.mean([int(len(str(x)) > 0) for x in i[1]])],
-            }).T
+        for idx, i in enumerate(self.rows + self.cols):
+            features = {
+                f'dist_string_{idx}': len(list(set([re.sub(r'\b\d+\b', '', str(x)) for x in i[1]]))) / len(i[1]),
+                f'ratio_colon_{idx}': np.mean([int(str(x).endswith(':')) for x in i[1]]),
+                f'ratio_contain_number_{idx}': np.mean([int(any(char.isdigit() for char in str(x))) for x in i[1]]),
+                f'ratio_is_number_{idx}': np.mean([int(type(x) in ['float', 'int']) for x in i[1]]),
+                f'ratio_nonempty_{idx}': np.mean([int(len(str(x)) > 0) for x in i[1]]),
+            }
 
-            self.obj = concat([self.obj, features])
+            self.obj.update(features)
 
     def transform(self):
         """
@@ -137,7 +154,7 @@ class _BaselineSample(object):
         self._add_html_features()
         self._add_lexical_features()
 
-        return self.obj.T
+        return self.obj
 
 
 def transform_for_baseline(raw_dataframe):
@@ -149,35 +166,39 @@ def transform_for_baseline(raw_dataframe):
     Returns:
         Dataframe with columns raw, label and feature space (107 columns)
     """
-    with_features = DataFrame()
-    for _, row in raw_dataframe.iterrows():
-        try:
-            with_features = with_features.append(_BaselineSample(row).transform(), ignore_index=True)
-        except:  # FIXME: only tables with min shape 2x2 in dataset!
-            print(row['path'])
+    records = raw_dataframe.to_dict('records')
+    new_records = []
 
-    return with_features
+    def _transform(rec):
+        new_records.append(_BaselineSample(rec).transform())
+
+    Parallel(n_jobs=-1, require='sharedmem')(delayed(_transform)(i) for i in tqdm(records))
+        
+    return DataFrame(new_records)
 
 
 class _ApproachSample(object):
-    def __init__(self, obj, base_path):
+    def __init__(self,
+                 obj,
+                 render_field='transformed_html',
+                 scale_cell_dimensions=True,
+                 cell_size='5px',
+                 long_text_threshold=10,
+                 draw_borders=True,
+                 target_shape=(224, 224),
+                 resize_mode='stretch'):
         super().__init__()
         self.obj = obj
-        self.base_path = base_path
+        self.render_field = render_field
+        self.scale_cell_dimensions = scale_cell_dimensions
+        self.cell_size = cell_size
+        self.long_text_threshold = long_text_threshold
+        self.draw_borders = draw_borders
+        self.target_shape = target_shape
+        self.resize_mode = resize_mode
 
     def _preprocess_html(self):
-        SCALE_CELL_DIMENSIONS = True
-        CELL_WIDTH_HEIGHT = '5px'
-
-        USE_TEXT_LENGTH = False
-        LONG_TEXT_LENGTH = 10
-
-        REMOVE_BORDERS = False
-
-        decoded = self.obj['raw'].decode('utf-8', 'replace')
-        soup = bs(decoded, 'html.parser')
-
-        # print(soup.prettify(formatter=None))
+        soup = bs(self.obj['raw'], 'html.parser')
 
         # clear all attributes that could impact styling (except col- and rowspan)
         for tag in soup.find_all():
@@ -190,9 +211,9 @@ class _ApproachSample(object):
 
         # set color
         for tag in soup.find_all('th'):
-            if SCALE_CELL_DIMENSIONS:
-                tag['width'] = CELL_WIDTH_HEIGHT
-                tag['height'] = CELL_WIDTH_HEIGHT
+            if self.scale_cell_dimensions:
+                tag['width'] = self.cell_size
+                tag['height'] = self.cell_size
 
             tag['style'] = 'background-color: grey'
             # replace content
@@ -202,9 +223,9 @@ class _ApproachSample(object):
             tag.clear()
 
         for tag in soup.find_all('td'):
-            if SCALE_CELL_DIMENSIONS:
-                tag['width'] = CELL_WIDTH_HEIGHT
-                tag['height'] = CELL_WIDTH_HEIGHT
+            if self.scale_cell_dimensions:
+                tag['width'] = self.cell_size
+                tag['height'] = self.cell_size
 
             color = 'white'
             if tag.find('a'):
@@ -217,14 +238,11 @@ class _ApproachSample(object):
                 color = 'pink'
             else:
                 text = tag.text.strip()
-
                 # cells text majority are numeric characters
                 if sum(c.isdigit() for c in text) > (len(text) / 2):
                     color = 'red'
-
-                elif USE_TEXT_LENGTH and len(text) > LONG_TEXT_LENGTH :
+                elif len(text) > self.long_text_threshold:
                     color = 'brown'
-
                 elif tag.find('b'):
                     color = 'orange'
                 else:
@@ -234,24 +252,62 @@ class _ApproachSample(object):
             # replace content
             tag.clear()
 
-        if REMOVE_BORDERS:
+        if not self.draw_borders:
             tag = soup.find('table')
             tag['cellspacing'] = 0
             tag['cellpadding'] = 0
 
-        #print(soup.prettify(formatter=None))
-        return soup.prettify(formatter=None)
+        self.obj.update({
+            'transformed_html': str(soup.prettify(formatter='minimal'))
+        })
 
-    def _create_image_from_html(self):
-        imgkit.from_string(self.new_html, self.img_temp_path)
+    def _generate_image_from_html(self, html):
+        with NamedTemporaryFile(suffix='.png') as f:
+            try:  # tables containing iframes or similar external sources cannot be rendered
+                imgkit.from_string(html,
+                                   f.name,
+                                   options={'quiet': '',
+                                            'disable-plugins': '',
+                                            'no-images': '',
+                                            'disable-javascript': '',
+                                            'height': 1024,
+                                            'width': 1024,
+                                            'load-error-handling': 'ignore'})
+                image = PIL.Image.open(f.name)
+            except:
+                image = PIL.Image.new('RGB', self.target_shape, (255, 255, 255))
+        return image.convert('RGB')
+    
+    def _crop_surrounding_whitespace(self, image):
+        bg = PIL.Image.new(image.mode, image.size, (255, 255, 255))
+        diff = PIL.ImageChops.difference(image, bg)
+        bbox = diff.getbbox()
+        if not bbox:
+            return image
+        return image.crop(bbox)
+    
+    def _resize(self, image):
+        if self.resize_mode == 'resize':
+            canvas = PIL.Image.new('RGB', self.target_shape, color=(255, 255, 255))
+            canvas.paste(image)
+            image.thumbnail(self.target_shape, PIL.Image.ANTIALIAS)
+        elif self.resize_mode == 'stretch':
+            image = image.resize(self.target_shape, PIL.Image.ANTIALIAS)
+        elif self.resize_mode == 'crop':
+            canvas = PIL.Image.new('RGB', self.target_shape, color=(255, 255, 255))
+            canvas.paste(image)
+            image = image.crop((0, 0, self.target_shape[0], self.target_shape[1]))
 
-    def _trim_image(self):
-        subprocess.run(['convert',self.img_temp_path,'-trim', self.img_trimmed_path])
+        return image
 
-    def _resize_image(self):
-        # Alternative way (resized proportionally)
-        # subprocess.run(['convert',self.img_path, "-resize", "500x500", "-extent", "500x500 ", self.img_resized_path])
-        subprocess.run(['convert',self.img_trimmed_path, "-resize", "500x500!", self.img_resized_path])
+    def _render_html(self):
+        image = self._generate_image_from_html(self.obj[self.render_field]) #.decode('utf-8', 'replace'))
+        image = self._crop_surrounding_whitespace(image)
+        image = self._resize(image)
+        
+        self.obj.update({
+            'image': image    
+        })
 
     def transform(self):
         """
@@ -263,25 +319,16 @@ class _ApproachSample(object):
             Dataframe with raw, label and feture vector for a single web column
         """
         try:
-            self.new_html = self._preprocess_html()
+            self._preprocess_html()
+            self._render_html()
         except:
-            self.new_html = '<table></table>'
-        self.img_temp_path = os.path.join(self.base_path, self.obj['path'].split("/")[-1] + '-temp.png')
-        self.img_trimmed_path = os.path.join(self.base_path, self.obj['path'].split("/")[-1] + '-trimmed.png')
-        self.img_resized_path = os.path.join(self.base_path, self.obj['path'].split("/")[-1] + '-resized.jpg')
-        self._create_image_from_html()
-        self._trim_image()
-        #self._resize_image()
-        features = DataFrame({
-            'img_path': [self.img_trimmed_path],
-            'new_html': [self.new_html]
-        }).T
-        self.obj = concat([self.obj, features])
+            self.obj['transformed_html'] = '<table></table>'
+            self._render_html()
 
-        return self.obj.T
+        return self.obj
 
 
-def transform_for_approach(raw_dataframe, dataset_dir):
+def transform_for_approach(raw_dataframe):
     """
     Transform an unprocessed web table dataset to feature space according to our approach
 
@@ -291,12 +338,12 @@ def transform_for_approach(raw_dataframe, dataset_dir):
         Dataframe with columns raw, label and imagepath
         Generates image representations of web table
     """
-    os.makedirs(dataset_dir, exist_ok=True)
+    records = raw_dataframe.to_dict('records')
+    new_records = []
 
-    with_img_path = DataFrame()
-    for _, row in raw_dataframe.iterrows():
-        try:
-            with_img_path = with_img_path.append(_ApproachSample(row, dataset_dir).transform(), ignore_index=True)
-        except:
-            continue
-    return with_img_path
+    def _transform(rec):
+        new_records.append(_ApproachSample(rec).transform())
+
+    Parallel(n_jobs=-1, require='sharedmem')(delayed(_transform)(i) for i in tqdm(records))
+        
+    return DataFrame(new_records)
