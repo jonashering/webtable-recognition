@@ -182,7 +182,7 @@ class _ApproachSample(object):
                  scale_cell_dimensions=True,
                  cell_size='5px',
                  long_text_threshold=10,
-                 draw_borders=True,
+                 remove_borders=False,
                  target_shape=(224, 224),
                  resize_mode='stretch'):
         super().__init__()
@@ -192,7 +192,7 @@ class _ApproachSample(object):
         self.scale_cell_dimensions = scale_cell_dimensions
         self.cell_size = cell_size
         self.long_text_threshold = long_text_threshold
-        self.draw_borders = draw_borders
+        self.remove_borders = remove_borders
         self.target_shape = target_shape
         self.resize_mode = resize_mode
 
@@ -202,11 +202,9 @@ class _ApproachSample(object):
         soup = self._clear_styling_attributes(soup)
 
         for tag in soup.find_all(['th','td']):
-            if self.scale_cell_dimensions:
-                tag['width'] = self.cell_size
-                tag['height'] = self.cell_size
+            tag = self._scale_cell_dimensions(tag)
 
-            color = 'white'
+            color = 'yellow'
             if tag.name == 'th':
                 color = 'grey'
             elif tag.find('a'):
@@ -226,20 +224,15 @@ class _ApproachSample(object):
                     color = 'brown'
                 elif tag.find('b'):
                     color = 'orange'
-                else:
-                    color = 'yellow'
 
-            tag['style'] = 'background-color: ' + color
+            tag['style'] = f'background-color: {color}'
             # replace content
                 # ALTERNATIVE CODE INCASE WE DECIDE TO KEEP THE STRUCTURE
                 # if KEEP_STRUCTURE and tag.string:
                 #   tag.string = "&nbsp;" * len(tag.string.strip())
             tag.clear()
 
-        if not self.draw_borders:
-            tag = soup.find('table')
-            tag['cellspacing'] = 0
-            tag['cellpadding'] = 0
+        soup = self._remove_borders(soup)
 
         self.obj.update({
             'transformed_html': str(soup.prettify(formatter='minimal'))
@@ -254,6 +247,19 @@ class _ApproachSample(object):
             if 'rowspan' in tag.attrs:
                 new_attr['rowspan'] = tag.attrs['rowspan']
             tag.attrs = new_attr
+        return soup
+
+    def _scale_cell_dimensions(self, tag):
+        if self.scale_cell_dimensions:
+            tag['width'] = self.cell_size
+            tag['height'] = self.cell_size
+        return tag
+
+    def _remove_borders(self, soup):
+        if self.remove_borders:
+            tag = soup.find('table')
+            tag['cellspacing'] = 0
+            tag['cellpadding'] = 0
         return soup
 
     def _generate_image_from_html(self, html):
