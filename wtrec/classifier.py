@@ -1,26 +1,45 @@
 from sklearn.ensemble import GradientBoostingClassifier
+from tensorflow.python.keras.applications import ResNet50
+from tensorflow.python.keras.models import Sequential
+from tensorflow.python.keras.layers import Dense
+from tensorflow.python.keras import optimizers
 
 
-RANDOM_STATE = 2 ** 16 - 1
 
-
-class BaselineClassifier(object):
+def create_baseline_classifier():
     """
-    GBDT classifier as specified in baseline paper
+    Create GBDT classifier as specified in baseline paper
     
-    Wrapper around scikit-learn classifier, implements same interface
+    Args:
+        None
+    Returns:
+        Scikit learn classifier implementing corresponding interface
     """
-    def __init__(self):
-        super().__init__()
-        self._clf = GradientBoostingClassifier(
-            min_samples_leaf=2,
-            n_estimators=100,
-            random_state=RANDOM_STATE,
-        )
+    return GradientBoostingClassifier(min_samples_leaf=2,
+                                      n_estimators=100,
+                                      random_state=0)
 
-    def fit(self, X, Y):
-        self._clf.fit(X, Y)
-        return self._clf
 
-    def predict(self, X):
-        return self._clf.predict(X)
+def create_nn_classifier(freeze_conv=True):
+    """
+    Create neural network for image rendering approach
+    
+    Args:
+        freeze_conv: Disable training of convolutional layers
+    Returns:
+        Keras model (compiled) implementing corresponding interface
+    """
+    model = Sequential()
+    model.add(ResNet50(include_top=False, pooling='avg', weights='imagenet'))
+    # model.add(Dense(1024, activation='relu'))
+    # model.add(Dense(512, activation='relu'))
+    model.add(Dense(4, activation='relu'))
+
+    if freeze_conv:
+        model.layers[0].trainable = False
+
+    sgd = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+
+    model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
+
+    return model
