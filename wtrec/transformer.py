@@ -221,7 +221,7 @@ class _ApproachSample(object):
         return soup
 
     def _is_emphasized(self, tag):
-        return len(tag.find_all(['b','strong','i'])) > 0
+        return len(tag.find_all(['b', 'strong', 'i'])) > 0
 
     def _preprocess_html_color_shades(self):
         soup = bs(self.obj['raw'], 'html.parser')
@@ -230,13 +230,11 @@ class _ApproachSample(object):
 
         for tag in soup.find_all(['th', 'td']):
             tag = self._scale_cell_dimensions(tag)
-
             text = tag.text.strip()
 
             # set red for data type
-            ## set r_step so there is an equivalent distance between the groups (255 / 6 ~= 42 )
+            # set r_step so there is an equivalent distance between the groups (255 / 6 ~= 42)
             r_step = 42
-
             r = 0 * r_step
             if tag.find('a'):
                 r = 1 * r_step
@@ -253,14 +251,10 @@ class _ApproachSample(object):
                 else:
                     r = 255
 
-            ## set g for content length
-            g = 0
-            if len(text) > 255:
-                g = 255
-            else:
-                g = len(text)
+            # set green for content length
+            g = min(len(text), 255)
 
-            ## set b for styling
+            # set blue for styling
             b = 0
             if self._is_emphasized(tag):
                 b = 127
@@ -281,7 +275,7 @@ class _ApproachSample(object):
 
         soup = self._clear_styling_attributes(soup)
 
-        for tag in soup.find_all(['th','td']):
+        for tag in soup.find_all(['th', 'td']):
             tag = self._scale_cell_dimensions(tag)
 
             color = 'yellow'
@@ -307,9 +301,9 @@ class _ApproachSample(object):
 
             tag['style'] = f'background-color: {color}'
             # replace content
-                # ALTERNATIVE CODE INCASE WE DECIDE TO KEEP THE STRUCTURE
-                # if KEEP_STRUCTURE and tag.string:
-                #   tag.string = "&nbsp;" * len(tag.string.strip())
+            # ALTERNATIVE CODE INCASE WE DECIDE TO KEEP THE STRUCTURE
+            # if KEEP_STRUCTURE and tag.string:
+            #     tag.string = "&nbsp;" * len(tag.string.strip())
             tag.clear()
 
         soup = self._remove_borders(soup)
@@ -327,7 +321,7 @@ class _ApproachSample(object):
             else:
                 cell['style'] = ';background-color:none !important'
 
-        # character classes: digits, alphabetical, punctuation, whitespace
+        # replace character classes with block symbol : digits, alphabetical, punctuation, whitespace
         for elem in soup.find_all(text=True):
             content = normalize('NFKD', elem)
             for char in content:
@@ -348,7 +342,7 @@ class _ApproachSample(object):
             img['style'] = img.get('style', '') + ';background-color:yellow !important'
 
         # emphasized text
-        for emp in soup.find_all(['a', 'strong', 'b', 'i', 'u', 'title',]):
+        for emp in soup.find_all(['a', 'strong', 'b', 'i', 'u', 'title']):
             emp['style'] = emp.get('style', '') + ';opacity:0.4 !important'
 
         # table head cells
@@ -357,7 +351,7 @@ class _ApproachSample(object):
 
         # input elements
         for inp in soup.find_all(['button', 'select', 'input']):
-            inp['style'] = inp.get('style', '') + ';background-color:pink !important; border: 0; padding: 3px;'
+            inp['style'] = inp.get('style', '') + ';background-color:pink !important; border: 0; padding: 5px;'
 
         # draw table border
         for tab in soup.find_all('table'):
@@ -402,6 +396,11 @@ class _ApproachSample(object):
             canvas = PIL.Image.new('RGB', self.target_shape, color=(255, 255, 255))
             image.thumbnail(self.target_shape, PIL.Image.ANTIALIAS)
             canvas.paste(image)
+        elif self.resize_mode == 'resize_fullwidth':
+            canvas = PIL.Image.new('RGB', self.target_shape, color=(255, 255, 255))
+            image.thumbnail((self.target_shape[0], 1024), PIL.Image.ANTIALIAS)
+            canvas.paste(image)
+            canvas = canvas.crop((0, 0, self.target_shape[0], self.target_shape[1]))
         elif self.resize_mode == 'stretch':
             canvas = image.resize(self.target_shape, PIL.Image.ANTIALIAS)
         elif self.resize_mode == 'crop':
