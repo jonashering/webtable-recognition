@@ -39,7 +39,7 @@ def _train_test_indices(num_samples, idx_file_path, test_size=0.3):
         test_indices = np.array(sample(range(num_samples), k=int(num_samples * test_size)))
         test_indices.dump(idx_file_path)
 
-    test_indices = np.load(idx_file_path)
+    test_indices = np.load(idx_file_path, allow_pickle=True)
     train_indices = np.array([i for i in range(num_samples) if i not in test_indices])
 
     return train_indices, test_indices

@@ -169,7 +169,10 @@ def transform_for_baseline(raw_dataframe):
     new_records = []
 
     def _transform(rec):
-        new_records.append(_BaselineSample(rec).transform())
+        try:
+            new_records.append(_BaselineSample(rec).transform())
+        except:
+            print(f'Skip {rec['path']}')
 
     Parallel(n_jobs=-1, require='sharedmem')(delayed(_transform)(i) for i in tqdm(records))
 
@@ -428,17 +431,14 @@ class _ApproachSample(object):
         Returns:
             Dataframe with raw, label and feture vector for a single web column
         """
-        try:
-            if self.strategy == 'raw':
-                self.obj['transformed_html'] = self.obj['raw']
-            elif self.strategy == 'grid':
-                self._preprocess_html_grid()
-            elif self.strategy == 'char_blocks':
-                self._preprocess_html_char_blocks()
-            elif self.strategy == 'color_shades':
-                self._preprocess_html_color_shades()
-        except:
-            self.obj['transformed_html'] = '<table></table>'
+        if self.strategy == 'raw':
+            self.obj['transformed_html'] = self.obj['raw']
+        elif self.strategy == 'grid':
+            self._preprocess_html_grid()
+        elif self.strategy == 'char_blocks':
+            self._preprocess_html_char_blocks()
+        elif self.strategy == 'color_shades':
+            self._preprocess_html_color_shades()
 
         self._render_html()
 
@@ -459,7 +459,10 @@ def transform_for_approach(raw_dataframe, strategy='raw', resize_mode='stretch')
     new_records = []
 
     def _transform(rec):
-        new_records.append(_ApproachSample(rec, strategy=strategy, resize_mode=resize_mode).transform())
+        try:
+            new_records.append(_ApproachSample(rec, strategy=strategy, resize_mode=resize_mode).transform())
+        except:
+            print(f'Skip {rec['path']}')
 
     Parallel(n_jobs=-1, require='sharedmem')(delayed(_transform)(i) for i in tqdm(records))
 
