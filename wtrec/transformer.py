@@ -395,6 +395,8 @@ class _ApproachSample(object):
         return image.crop(bbox)
 
     def _resize(self, image):
+        if self.resize_mode == 'none':
+            return image
         if self.resize_mode == 'resize':
             canvas = PIL.Image.new('RGB', self.target_shape, color=(255, 255, 255))
             image.thumbnail(self.target_shape, PIL.Image.ANTIALIAS)
