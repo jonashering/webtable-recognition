@@ -172,7 +172,7 @@ def transform_for_baseline(raw_dataframe):
         try:
             new_records.append(_BaselineSample(rec).transform())
         except:
-            print(f'Skip {rec['path']}')
+            print("Skip ", rec["path"])
 
     Parallel(n_jobs=-1, require='sharedmem')(delayed(_transform)(i) for i in tqdm(records))
 
@@ -186,6 +186,7 @@ class _ApproachSample(object):
                  scale_cell_dimensions=True,
                  cell_size='5px',
                  long_text_threshold=10,
+                 use_long_text_threshold=False,
                  remove_borders=False,
                  target_shape=(224, 224),
                  resize_mode='stretch'):
@@ -195,6 +196,7 @@ class _ApproachSample(object):
         self.scale_cell_dimensions = scale_cell_dimensions
         self.cell_size = cell_size
         self.long_text_threshold = long_text_threshold
+        self.use_long_text_threshold = use_long_text_threshold
         self.remove_borders = remove_borders
         self.target_shape = target_shape
         self.resize_mode = resize_mode
@@ -297,7 +299,7 @@ class _ApproachSample(object):
                 # cells text majority are numeric characters
                 if sum(c.isdigit() for c in text) > (len(text) / 2):
                     color = 'red'
-                elif len(text) > self.long_text_threshold:
+                elif self.use_long_text_threshold and len(text) > self.long_text_threshold:
                     color = 'brown'
                 elif self._is_emphasized(tag):
                     color = 'orange'
@@ -464,7 +466,7 @@ def transform_for_approach(raw_dataframe, strategy='raw', resize_mode='stretch')
         try:
             new_records.append(_ApproachSample(rec, strategy=strategy, resize_mode=resize_mode).transform())
         except:
-            print(f'Skip {rec['path']}')
+            print("Skip ", rec["path"])
 
     Parallel(n_jobs=-1, require='sharedmem')(delayed(_transform)(i) for i in tqdm(records))
 
