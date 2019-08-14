@@ -13,4 +13,5 @@ joblib
 tqdm
 regex
 Pillow
+lxml
 flake8

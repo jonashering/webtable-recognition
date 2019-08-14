@@ -16,10 +16,10 @@ The modules of our pipeline are implemented in `wtrec`. Our pipeline looks like 
 (Dataset)
     |
     |
-[loader.py] --> [transformer.py] --> [splitter.py] --> [classifier.py] --> [evaluator.py]
-																				 |
-																				 |
-																	  (Classification Result)
+[loader.py] -> [transformer.py] -> [splitter.py] -> [classifier.py] -> [evaluator.py]
+                                                                             |
+                                                                             |
+                                                              (Classification Result)
 ```
 
 The actual pipelines are implemented using Jupyter Notebooks: see `approach_pipeline.ipynb` and `baseline_pipeline.ipynb` for details.
@@ -47,3 +47,8 @@ jupyter notebook
 # open the approach_pipeline or baseline_pipeline notebook in the web interface
 # run all cells!
 ``` 
+
+
+## Report
+
+Find our report at `report.pdf`.
