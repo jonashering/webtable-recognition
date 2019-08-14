@@ -1,7 +1,7 @@
 from sklearn.ensemble import GradientBoostingClassifier
 from tensorflow.python.keras.applications import ResNet50
-from tensorflow.python.keras.models import Sequential
-from tensorflow.python.keras.layers import Dense
+from tensorflow.python.keras.models import Model
+from tensorflow.python.keras.layers import Dense, GlobalAveragePooling2D
 from tensorflow.python.keras import optimizers
 
 
@@ -19,24 +19,22 @@ def create_baseline_classifier():
                                       random_state=0)
 
 
-def create_nn_classifier(freeze_conv=True):
+def create_nn_classifier():
     """
     Create neural network for image rendering approach
 
     Args:
-        freeze_conv: Disable training of convolutional layers
+        None
     Returns:
         Keras model (compiled) implementing corresponding interface
     """
-    model = Sequential()
-    model.add(ResNet50(include_top=False, pooling='avg', weights='imagenet'))
-    # model.add(Dense(1024, activation='relu'))
-    # model.add(Dense(512, activation='relu'))
-    model.add(Dense(4, activation='relu'))
+    base_model = ResNet50(weights='imagenet', include_top=False)
+    x = base_model.output
+    x = GlobalAveragePooling2D()(x)
+    x = Dense(1024, activation='relu')(x)
+    predictions = Dense(4, activation='softmax')(x)
 
-    if freeze_conv:
-        model.layers[0].trainable = False
-
+    model = Model(inputs=base_model.input, outputs=predictions)
     sgd = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
 
     model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])

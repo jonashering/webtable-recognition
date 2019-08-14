@@ -119,8 +119,10 @@ class _BaselineSample(object):
                 f'ratio_anchor_{idx}': len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('a'))]) / len(i[0]),
                 f'ratio_img_{idx}': len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('img'))]) / len(i[0]),
                 f'ratio_input_{idx}': len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('input'))]) / len(i[0]),
-                f'ratio_select_{idx}': len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('select'))]) / len(i[0]),
-                f'ratio_f_{idx}': len([1 for x in i[0] if len(bs(x, 'html.parser').find_all(['b', 'u', 'font', 'i']))]) / len(i[0]),
+                f'ratio_select_{idx}':
+                    len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('select'))]) / len(i[0]),
+                f'ratio_f_{idx}':
+                    len([1 for x in i[0] if len(bs(x, 'html.parser').find_all(['b', 'u', 'font', 'i']))]) / len(i[0]),
                 f'ratio_br_{idx}': len([1 for x in i[0] if len(bs(x, 'html.parser').find_all('br'))]) / len(i[0]),
             }
 
@@ -172,7 +174,7 @@ def transform_for_baseline(raw_dataframe):
         try:
             new_records.append(_BaselineSample(rec).transform())
         except:
-            print("Skip ", rec["path"])
+            print('Skip ', rec['path'])
 
     Parallel(n_jobs=-1, require='sharedmem')(delayed(_transform)(i) for i in tqdm(records))
 
@@ -455,6 +457,8 @@ def transform_for_approach(raw_dataframe, strategy='raw', resize_mode='stretch')
 
     Args:
         Dataframe with columns raw and label
+        strategy: raw, grid, char_blocks, color_shades
+        resize_mode: stretch, resize, resize_fullwidth, crop
     Returns:
         Dataframe with columns raw, label, transformed_html and image
         Generates image representations of web table
@@ -466,7 +470,7 @@ def transform_for_approach(raw_dataframe, strategy='raw', resize_mode='stretch')
         try:
             new_records.append(_ApproachSample(rec, strategy=strategy, resize_mode=resize_mode).transform())
         except:
-            print("Skip ", rec["path"])
+            print('Skip ', rec['path'])
 
     Parallel(n_jobs=-1, require='sharedmem')(delayed(_transform)(i) for i in tqdm(records))
 
