@@ -29,6 +29,10 @@ Make sure to install Python >= 3.6 and the Python package manager pip3.
 To install the project requirements, run:
 ```
 pip3 install -r requirements.txt
+# Plus, on Ubuntu run:
+sudo apt-get install wkhtmltopdf
+# Or, on MacOS run:
+brew install wkhtmltopdf
 ```
 
 ## Dataset
