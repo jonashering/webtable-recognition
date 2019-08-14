@@ -12,3 +12,5 @@ imgkit
 joblib
 tqdm
 regex
+Pillow
+flake8

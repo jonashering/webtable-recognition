@@ -13,12 +13,13 @@ We have studied the question of how the different types of web tables can be rel
 The modules of our pipeline are implemented in `wtrec`. Our pipeline looks like this:
 
 ```
-graph LR
-	A(loader.py)
-	A --> B(transformer.py) 
-	B --> C(splitter.py)
-	C --> D(classifier.py)
-	D --> E(evaluator.py)
+(Dataset)
+    |
+    |
+[loader.py] --> [transformer.py] --> [splitter.py] --> [classifier.py] --> [evaluator.py]
+																				 |
+																				 |
+																	  (Classification Result)
 ```
 
 The actual pipelines are implemented using Jupyter Notebooks: see `approach_pipeline.ipynb` and `baseline_pipeline.ipynb` for details.
