@@ -17,9 +17,6 @@ The modules of our pipeline are implemented in `wtrec`. Our pipeline looks like 
     |
     |
 [loader.py] -> [transformer.py] -> [splitter.py] -> [classifier.py] -> [evaluator.py]
-                                                                             |
-                                                                             |
-                                                              (Classification Result)
 ```
 
 The actual pipelines are implemented using Jupyter Notebooks: see `approach_pipeline.ipynb` and `baseline_pipeline.ipynb` for details.
